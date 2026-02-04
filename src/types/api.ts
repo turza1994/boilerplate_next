@@ -1,4 +1,4 @@
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
   message?: string;
@@ -9,20 +9,40 @@ export interface LoginRequest {
   password: string;
 }
 
+export interface SignupRequest {
+  email: string;
+  password: string;
+  name: string;
+}
+
 export interface LoginResponse {
-  user: {
-    id: string;
-    email: string;
+  data: {
+    user: {
+      id: string;
+      email: string;
+    };
+    accessToken: string;
   };
-  accessToken: string;
+}
+
+export interface SignupResponse {
+  data: {
+    user: {
+      id: string;
+      email: string;
+    };
+    accessToken: string;
+  };
 }
 
 export interface RefreshTokenRequest {
-  refreshToken: string;
+  refreshToken?: string; // Optional since backend uses HttpOnly cookies
 }
 
 export interface RefreshTokenResponse {
-  accessToken: string;
+  data: {
+    accessToken: string;
+  };
 }
 
 export interface User {

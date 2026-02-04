@@ -4,12 +4,11 @@ import type { NextRequest } from 'next/server';
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Get access token from localStorage (note: this won't work in middleware)
-  // Instead, we'll check for the token in cookies or headers
+  // Get access token from cookie (set by AuthContext)
   const token = request.cookies.get('access_token')?.value;
 
   // Public routes that don't require authentication
-  const publicRoutes = ['/login', '/'];
+  const publicRoutes = ['/login', '/signup', '/'];
   
   // Protected routes that require authentication
   const protectedRoutes = ['/dashboard'];
@@ -19,7 +18,7 @@ export function middleware(request: NextRequest) {
     pathname.startsWith(route)
   );
 
-  // Check if the current path is public
+  // Check if the current path is public (not currently used, kept for documentation)
   const isPublicRoute = publicRoutes.some(route => 
     pathname === route || pathname === '/'
   );
@@ -31,8 +30,8 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // If user is authenticated and tries to access login, redirect to dashboard
-  if (token && pathname === '/login') {
+  // If user is authenticated and tries to access login/signup, redirect to dashboard
+  if (token && (pathname === '/login' || pathname === '/signup')) {
     const dashboardUrl = new URL('/dashboard', request.url);
     return NextResponse.redirect(dashboardUrl);
   }

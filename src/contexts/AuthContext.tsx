@@ -5,9 +5,7 @@ import { apiClient } from '@/lib/apiClient';
 import { 
   getAccessToken, 
   setAccessToken, 
-  setRefreshToken, 
-  clearAllTokens,
-  getRefreshToken 
+  clearAllTokens
 } from '@/lib/auth';
 import { AuthContextType, AuthState } from '@/types/auth';
 
@@ -28,7 +26,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const checkAuth = async () => {
       try {
         const accessToken = getAccessToken();
-        const refreshToken = getRefreshToken();
 
         if (accessToken) {
           // Verify token is still valid by making a request
@@ -43,36 +40,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               }));
               return;
             }
-          } catch (error) {
-            // Token is invalid, try to refresh
-            const refreshTokenValue = getRefreshToken();
-            if (refreshTokenValue) {
-              try {
-                await new Promise((resolve, reject) => {
-                  const response = fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/auth/refresh-token`, {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json',
-                    },
-                    credentials: 'include',
-                    body: JSON.stringify({ refreshToken: refreshTokenValue }),
-                  });
-                  
-                  response.then(res => {
-                    if (res.ok) {
-                      return res.json();
-                    }
-                    throw new Error('Refresh failed');
-                  }).then(data => {
-                    if (data.success && data.data?.accessToken) {
-                      setAccessToken(data.data.accessToken);
-                      resolve(data.data.accessToken);
-                    } else {
-                      reject(new Error('Invalid refresh response'));
-                    }
-                  }).catch(reject);
-                });
-                
+          } catch {
+            // Token is invalid, try to refresh using apiClient
+            try {
+              const refreshed = await apiClient.refreshAccessToken();
+              if (refreshed) {
                 const newAccessToken = getAccessToken();
                 if (newAccessToken) {
                   setState(prev => ({
@@ -83,9 +55,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                   }));
                   return;
                 }
-              } catch (refreshError) {
-                console.error('Token refresh failed:', refreshError);
               }
+            } catch (refreshError) {
+              console.error('Token refresh failed:', refreshError);
             }
           }
         }
@@ -115,13 +87,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const response = await apiClient.login({ email, password });
       
       if (response.success && response.data) {
-        const { user, accessToken } = response.data;
+        const { user, accessToken } = response.data.data;
         
-        // Store tokens
+        // Store access token
         setAccessToken(accessToken);
         
-        // Note: In production, refresh token should be set by server as HttpOnly cookie
-        // For demo purposes, we'll assume it's handled automatically
+        // Note: Refresh token is set by server as HttpOnly cookie
         
         setState({
           user,
@@ -150,33 +121,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshToken = async (): Promise<void> => {
     try {
-      const refreshToken = getRefreshToken();
-      if (!refreshToken) {
-        throw new Error('No refresh token available');
-      }
-
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/auth/refresh-token`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({ refreshToken }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Token refresh failed');
-      }
-
-      const data = await response.json();
-      if (data.success && data.data?.accessToken) {
-        setAccessToken(data.data.accessToken);
-        setState(prev => ({
-          ...prev,
-          accessToken: data.data.accessToken,
-        }));
+      const refreshed = await apiClient.refreshAccessToken();
+      if (refreshed) {
+        const newAccessToken = getAccessToken();
+        if (newAccessToken) {
+          setState(prev => ({
+            ...prev,
+            accessToken: newAccessToken,
+          }));
+        } else {
+          throw new Error('Failed to get new access token');
+        }
       } else {
-        throw new Error('Invalid refresh response');
+        throw new Error('Token refresh failed');
       }
     } catch (error) {
       logout(); // Clear invalid tokens

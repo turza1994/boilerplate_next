@@ -1,11 +1,11 @@
 # AGENTS.md
 
-This file contains essential guidelines for AI agents working on this Next.js boilerplate project. Follow these conventions to maintain code quality and consistency.
+This file contains essential guidelines for AI agents working on this Next.js 16 boilerplate project with JWT authentication integration. Follow these conventions to maintain code quality and consistency.
 
 ## Development Commands
 
 ### Core Commands
-- `npm run dev` - Start development server (runs on port 3001)
+- `npm run dev` - Start development server (runs on port 3000, falls back to 3001)
 - `npm run build` - Production build with TypeScript compilation
 - `npm run start` - Start production server
 - `npm run lint` - Run ESLint checks (fix with `npm run lint --fix`)
@@ -51,7 +51,7 @@ import { LoginRequest } from '@/types/api';
 ```
 
 ### TypeScript Rules
-- **Strict mode enabled** - No `any` types allowed
+- **Strict mode enabled** - No `any` types allowed, use `unknown` instead
 - Always type API responses with proper interfaces
 - Use `interface` for object shapes, `type` for unions/primitives
 - Prefer generics over `any` (`ApiResponse<T>`)
@@ -110,28 +110,13 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
 );
 ```
 
-## Error Handling
-
-### API Error Pattern
-```typescript
-try {
-  const result = await apiClient.post('/endpoint', data);
-  // handle success
-} catch (error) {
-  const message = error instanceof Error ? error.message : 'Operation failed';
-  // Show user feedback (toast, alert, etc.)
-  setSubmitError(message);
-} finally {
-  setIsLoading(false);
-}
-```
-
-### Form Validation
-- Use React Hook Form + Zod schemas
-- Display validation errors below inputs
-- Handle submit errors with user-friendly messages
-
 ## Authentication Integration
+
+### JWT Token Management
+- **Access Tokens**: 15min expiry, stored in localStorage + cookie
+- **Refresh Tokens**: 7d expiry, HttpOnly cookies (server-managed)
+- **CSRF Protection**: Required for refresh token requests
+- **API Base URL**: `http://localhost:5000` (configured in `.env.local`)
 
 ### Using Auth Context
 ```typescript
@@ -154,6 +139,45 @@ import { apiClient } from '@/lib/apiClient';
 
 // Automatic token refresh on 401 responses
 const result = await apiClient.get('/protected-endpoint');
+```
+
+## Error Handling
+
+### API Error Pattern
+```typescript
+try {
+  const result = await apiClient.post('/endpoint', data);
+  // handle success
+} catch (error) {
+  const message = error instanceof Error ? error.message : 'Operation failed';
+  // Show user feedback (toast, alert, etc.)
+  setSubmitError(message);
+} finally {
+  setIsLoading(false);
+}
+```
+
+### Form Validation
+- Use React Hook Form + Zod schemas
+- Display validation errors below inputs
+- Handle submit errors with user-friendly messages
+
+## Security Requirements
+
+### CSRF Token Handling
+```typescript
+import { getCSRFToken, addCSRFToHeaders } from '@/lib/csrf';
+
+// CSRF tokens automatically added to state-changing requests
+// Tokens extracted from x-csrf-token response headers
+```
+
+### Response Format
+Backend API uses nested structure:
+```typescript
+// Format: { success: boolean, data: T, message?: string }
+const response = await apiClient.login(credentials);
+const { user, accessToken } = response.data.data; // Note: nested data
 ```
 
 ## Styling Conventions
@@ -202,13 +226,13 @@ Define design tokens in `globals.css`:
 1. Define types in `src/types/` first
 2. Use centralized `apiClient` for HTTP requests
 3. Handle loading and error states properly
-4. Implement proper token refresh logic
+4. CSRF tokens automatically handled for state-changing operations
 
 ## Environment Configuration
 
 Required environment variables:
 ```env
-NEXT_PUBLIC_API_BASE_URL=http://localhost:3000
+NEXT_PUBLIC_API_BASE_URL=http://localhost:5000
 ```
 
 ## Quick Reference
@@ -225,13 +249,6 @@ touch src/components/ui/new-ui-element.tsx
 touch src/types/new-feature.ts
 ```
 
-### Adding New Pages
-```bash
-# App Router pages
-touch src/app/new-route/page.tsx
-touch src/app/new-route/layout.tsx # if needed
-```
-
 ### Common Imports
 ```typescript
 // Utilities
@@ -243,7 +260,7 @@ import { Button, Input, Card } from '@/components/ui';
 
 // Hooks & Contexts
 import { useAuth } from '@/contexts/AuthContext';
-import { useForm } from '@/hooks/useForm';
+import { useForm } from 'react-hook-form';
 ```
 
 ## Technology Stack
@@ -253,7 +270,7 @@ import { useForm } from '@/hooks/useForm';
 - **Styling**: Tailwind CSS 3.4.19 + CSS variables
 - **UI**: shadcn/ui + Radix UI
 - **Forms**: React Hook Form + Zod validation
-- **Auth**: JWT with automatic refresh
+- **Auth**: JWT with automatic refresh + CSRF protection
 - **Build**: npm, ESLint, PostCSS
 
-Follow these patterns to maintain consistency and leverage the full capabilities of this modern Next.js boilerplate.
+Follow these patterns to maintain consistency and leverage the full capabilities of this modern Next.js boilerplate with robust authentication.

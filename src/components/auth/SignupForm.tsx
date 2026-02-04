@@ -2,42 +2,41 @@
 
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { loginSchema, LoginFormData } from '@/lib/validation';
-import { useSearchParams } from 'next/navigation';
-import { useAuth } from '@/contexts/AuthContext';
+import { signupSchema, SignupFormData } from '@/lib/validation';
+import { apiClient } from '@/lib/apiClient';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useState } from 'react';
 
-export function LoginForm() {
-  const { login } = useAuth();
+export function SignupForm() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-
-  // Check if user was redirected after successful signup
-  const message = searchParams.get('message');
-  const showSuccessMessage = message === 'signup-success';
 
   const {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<LoginFormData>({
-    resolver: zodResolver(loginSchema),
+  } = useForm<SignupFormData>({
+    resolver: zodResolver(signupSchema),
   });
 
-  const onSubmit = async (data: LoginFormData) => {
+  const onSubmit = async (data: SignupFormData) => {
     setIsLoading(true);
     setSubmitError(null);
 
     try {
-      await login(data.email, data.password);
-      router.push('/dashboard');
+      const response = await apiClient.signup(data);
+      
+      if (response.success && response.data) {
+        // Registration successful, redirect to login
+        router.push('/login?message=signup-success');
+      } else {
+        throw new Error(response.message || 'Signup failed');
+      }
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : 'Login failed');
+      setSubmitError(error instanceof Error ? error.message : 'Signup failed');
     } finally {
       setIsLoading(false);
     }
@@ -48,26 +47,27 @@ export function LoginForm() {
       <div className="max-w-md w-full space-y-8">
         <div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Sign in to your account
+            Create your account
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
             Or{' '}
-            <a href="/signup" className="font-medium text-blue-600 hover:text-blue-500">
-              create a new account
+            <a href="/login" className="font-medium text-blue-600 hover:text-blue-500">
+              sign in to your existing account
             </a>
           </p>
         </div>
-
-        {showSuccessMessage && (
-          <div className="rounded-md bg-green-50 p-4">
-            <div className="text-sm text-green-800">
-              Account created successfully! Please sign in.
-            </div>
-          </div>
-        )}
         
         <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)}>
           <div className="space-y-4">
+            <Input
+              {...register('name')}
+              type="text"
+              label="Full name"
+              placeholder="Enter your full name"
+              error={errors.name?.message}
+              autoComplete="name"
+            />
+
             <Input
               {...register('email')}
               type="email"
@@ -81,9 +81,9 @@ export function LoginForm() {
               {...register('password')}
               type="password"
               label="Password"
-              placeholder="Enter your password"
+              placeholder="Create a password"
               error={errors.password?.message}
-              autoComplete="current-password"
+              autoComplete="new-password"
             />
           </div>
 
@@ -102,7 +102,7 @@ export function LoginForm() {
               isLoading={isLoading}
               disabled={isLoading}
             >
-              Sign in
+              Create account
             </Button>
           </div>
         </form>

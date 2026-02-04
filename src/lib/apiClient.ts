@@ -1,7 +1,8 @@
-import { ApiResponse, LoginRequest, LoginResponse, RefreshTokenResponse } from '@/types/api';
-import { getAccessToken, setAccessToken, getRefreshToken } from './auth';
+import { ApiResponse, LoginRequest, LoginResponse, RefreshTokenResponse, SignupRequest, SignupResponse } from '@/types/api';
+import { getAccessToken, setAccessToken } from './auth';
+import { addCSRFToHeaders, extractCSRFFromResponse } from './csrf';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
 
 class ApiClient {
   private baseURL: string;
@@ -27,6 +28,11 @@ class ApiClient {
       headers['Authorization'] = `Bearer ${accessToken}`;
     }
 
+    // Add CSRF token for state-changing operations (POST, PUT, DELETE, PATCH)
+    if (options.method && ['POST', 'PUT', 'DELETE', 'PATCH'].includes(options.method.toUpperCase())) {
+      addCSRFToHeaders(headers);
+    }
+
     // Include credentials for refresh token cookies
     const config: RequestInit = {
       ...options,
@@ -37,6 +43,9 @@ class ApiClient {
     try {
       const response = await fetch(url, config);
       const data: ApiResponse<T> = await response.json();
+
+      // Extract CSRF token from response headers if present
+      extractCSRFFromResponse(response);
 
       // Handle 401 Unauthorized - attempt token refresh
       if (response.status === 401 && !endpoint.includes('/refresh-token')) {
@@ -59,24 +68,29 @@ class ApiClient {
     }
   }
 
-  private async refreshAccessToken(): Promise<boolean> {
+  async refreshAccessToken(): Promise<boolean> {
     try {
-      const refreshToken = getRefreshToken();
-      if (!refreshToken) return false;
+      // Use empty headers object to be enhanced with CSRF token
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+
+      // Add CSRF token to headers
+      addCSRFToHeaders(headers);
 
       const response = await fetch(`${this.baseURL}/api/auth/refresh-token`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         credentials: 'include',
-        body: JSON.stringify({ refreshToken }),
+        // No body needed - refresh token is in HttpOnly cookie
       });
 
       if (response.ok) {
         const data: ApiResponse<RefreshTokenResponse> = await response.json();
-        if (data.success && data.data?.accessToken) {
-          setAccessToken(data.data.accessToken);
+        if (data.success && data.data?.data?.accessToken) {
+          setAccessToken(data.data.data.accessToken);
+          // Extract CSRF token if present in response
+          extractCSRFFromResponse(response);
           return true;
         }
       }
@@ -94,7 +108,7 @@ class ApiClient {
     });
   }
 
-  async signup(userData: LoginRequest): Promise<ApiResponse<LoginResponse>> {
+  async signup(userData: SignupRequest): Promise<ApiResponse<SignupResponse>> {
     return this.request('/api/auth/signup', {
       method: 'POST',
       body: JSON.stringify(userData),
@@ -107,7 +121,7 @@ class ApiClient {
   }
 
   // Generic POST request
-  async post<T>(endpoint: string, data: any): Promise<ApiResponse<T>> {
+  async post<T>(endpoint: string, data: unknown): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, {
       method: 'POST',
       body: JSON.stringify(data),
@@ -115,7 +129,7 @@ class ApiClient {
   }
 
   // Generic PUT request
-  async put<T>(endpoint: string, data: any): Promise<ApiResponse<T>> {
+  async put<T>(endpoint: string, data: unknown): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, {
       method: 'PUT',
       body: JSON.stringify(data),

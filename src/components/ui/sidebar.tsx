@@ -75,8 +75,9 @@ const Sidebar: React.FC<React.HTMLAttributes<HTMLDivElement>> = ({ className, ch
 }
 
 const SidebarTrigger: React.FC<React.HTMLAttributes<HTMLButtonElement>> = ({ className, ...props }) => {
+  const { open, setOpen } = useSidebar()
+
   const handleToggle = () => {
-    const { open, setOpen } = useSidebar()
     setOpen(!open)
   }
 
