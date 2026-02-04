@@ -1,7 +1,7 @@
 'use client';
 
 import { useAuth } from '@/contexts/AuthContext';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@/components/ui/button';
 import { apiClient } from '@/lib/apiClient';
 import { useState, useEffect } from 'react';
 import { SampleItem } from '@/types/api';
